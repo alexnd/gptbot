@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Websocket test</title>
+    <style>
+      body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #cccccc; }
+      #container { max-width: 1000px; margin-left: auto; margin-right: auto; }
+      #form { max-width: 1000px; margin-left: auto; margin-right: auto; background: rgba(90, 90, 90, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
+      #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
+      #input:focus { outline: none; }
+      #form > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
+      #chat_thread { height:calc(100vh - 40px); display: flex; flex-direction: column; justify-content: end; background-color: #f0f0f0; }
+      #messages { display: flex; flex-flow: column-reverse; margin: 0; padding: 0; }
+      #messages > li { list-style-type: none; padding: 0.5rem 1rem; }
+      /*#messages > li:nth-child(odd) { background: #efefef; }*/
+      #messages > li.reply { background: #e0e0e0; text-align: right; }
+      #header { position: fixed; width: 100%; height: 42px; top: 0; display: flex; align-items: center; justify-content: space-around; }
+      #header h1 { font-size: 1.6rem; color:#000000; }
+    </style>
+  </head>
+  <body>
+    <div id="header"><h1>ChatGPT Bot Demo</h1></div>
+    <div id="container">
+      <div id="chat_thread">
+        <ul id="messages"></ul>
+      </div>
+      <form id="form" action="">
+        <input id="input" autocomplete="off" />
+        <button id="button">Send</button>
+      </form>
+    </div>
+    <!--<script src="/socket.io/socket.io.js"></script>-->
+    <script>
+      //var socket = new WebSocket("ws://" + location.host);
+      var socket = null, elMessages = null, elForm = null, elInput = null, elButton = null, question = '';
+
+      function init() {
+        //socket = io('ws://localhost:3000');
+        elMessages = document.getElementById('messages');
+        elForm = document.getElementById('form');
+        elInput = document.getElementById('input');
+        elButton = document.getElementById('button');
+
+        elForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          sendMessage();
+        });
+
+        elButton.addEventListener('click', function(e) {
+          e.preventDefault();
+          sendMessage();
+        });
+
+        /*socket.on('chat message', function(msg) {
+          console.log('ws message', msg);
+          renderMessage(msg);
+          window.scrollTo(0, document.body.scrollHeight);
+        });*/
+      }
+
+      function renderMessage(msg, isReply) {
+        var el = document.createElement('li');
+        if (isReply) el.className = 'reply';
+        el.textContent = msg;
+        elMessages.appendChild(el);
+        elMessages.insertBefore(el, elMessages.firstChild);
+        window.scrollTo(0, document.body.scrollHeight);
+      }
+
+      function renderJson(obj) {
+        var el = document.createElement('li');
+        el.innerHTML = '<pre>' + JSON.stringify(obj, null, 2) + '</pre>';
+        elMessages.appendChild(el);
+      }
+
+      function sendMessage() {
+        var msg = elInput.value;
+        msg = msg.trim();
+        if (!msg) return;
+        /*const msg = {ts: Date.now(), fromUser: 'root', msg: elInput.value};
+        console.log('*[socket.send]', msg);
+        socket.send(JSON.stringify(msg));*/
+        question = msg;
+        elInput.value = '';
+        renderMessage(question);
+        apiChat(msg);
+      }
+
+      function apiChat(msg) {
+        fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          mode: 'cors',
+          cache: 'no-cache',
+          body: JSON.stringify({message: msg})
+        })
+        .then(function(res) {
+          return res.json();
+        })
+        .then(function(data) {
+          console.log('*[responce]', data);
+          if (data && Array.isArray(data)) {
+            renderMessage(data.join('\n'), true);
+          } else {
+            renderMessage(data, true);
+          }
+        })
+        .catch(function(err) {
+          console.error(err);
+          alert(err.message);
+        });
+      }
+
+      function apiTest() {
+        fetch('/api', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          mode: 'cors',
+          cache: 'no-cache',
+        })
+        .then(function(res) {
+          return res.json();
+        })
+        .then(function(data) {
+          console.log('*[responce]', data);
+          renderJson(data);
+        })
+        .catch(function(err) {
+          console.error(err);
+          alert(err.message);
+        });
+      }
+
+      window.addEventListener('load', init);
+
+      /*
+      socket.onopen = function(e) {
+        console.log('*[websocket connected]');
+      };
+      socket.onclose = function(event) {
+        if (event.wasClean) {
+          console.log('*[websocket closed] code=' + event.code + ' reason=' +event.reason);
+        } else {
+          // server process killed or network down
+          // event.code is usually 1006 in this case
+          console.log('*[websocket connection closed]');
+        }
+      };
+      socket.onerror = function(error) {
+        console.log('*[websocket error]');
+      };
+      socket.onmessage = function(msg) {
+        console.log('*[websocket message]', msg);
+        var item = document.createElement('li');
+        item.textContent = msg.data;
+        elMessages.appendChild(item);
+        window.scrollTo(0, document.body.scrollHeight);
+      };*/
+    </script>
+  </body>
+</html>

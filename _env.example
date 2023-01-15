@@ -1,0 +1,7 @@
+API_PORT=3000
+API_ADDR=0.0.0.0
+
+STATIC_PATH=public
+
+OPENAI_API_KEY=
+OPENAI_API_URI=https://api.openai.com/v1/
