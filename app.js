@@ -82,7 +82,7 @@ if (process.env.STATIC_PATH) {
 
 // 404
 app.all('*', (req, res) => {
-  res.sendError(messages.notFound, 404);
+  res.sendError('Not Found', 404);
 });
   
 // errors handling
