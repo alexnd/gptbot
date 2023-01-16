@@ -12,6 +12,11 @@ const express = require('express');
 const PORT = process.env.API_PORT || 3000;
 const ADDR = process.env.API_ADDR || '0.0.0.0';
 const ROOT_PATH = process.env.ROOT_PATH || '/api';
+const OPENAI_API_URI = process.env.OPENAI_API_URI || 'https://api.openai.com/v1/';
+const OPENAI_FUNCTION = process.env.OPENAI_FUNCTION || 'completions';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'text-davinci-003';
+const OPENAI_TEMPERATURE = process.env.OPENAI_TEMPERATURE || 0;
+const OPENAI_MAX_TOKENS = process.env.OPENAI_MAX_TOKENS || 7;
 
 //console.log('*[env]', process.env);
 
@@ -143,15 +148,15 @@ function chatGTPcompletions(message) {
       if (!process.env.OPENAI_API_URI) {
         return reject(new Error('OPENAI_API_URI not set'))
       }
-      const uri = `${process.env.OPENAI_API_URI}completions`;
+      const uri = `${OPENAI_API_URI}${OPENAI_FUNCTION}`;
       //console.log('*uri:', uri);
       const u = url.parse(uri);
       //console.log('*url:', uri);
       const payload = {
-        model: 'text-davinci-003',
+        model: OPENAI_MODEL,
         prompt: message,
-        temperature: 0,
-        max_tokens: 7,
+        temperature: +OPENAI_TEMPERATURE,
+        max_tokens: +OPENAI_MAX_TOKENS,
       };
       const options = {
         hostname: u.hostname,
