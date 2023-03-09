@@ -25,3 +25,4 @@ typings/
 .DS_Store
 Homestead.json
 Homestead.yaml
+/work

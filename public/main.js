@@ -18,6 +18,9 @@ function init() {
     sendMessage();
   });
 
+  setTimeout(function() {
+    renderMessage('Wellcome to GPT-based chatbot! Ask me something...', true);
+  }, 1500);
   /*
   socket.onopen = function(e) {
     console.log('*[websocket connected]');
