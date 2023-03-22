@@ -99,7 +99,11 @@ function apiChat(msg) {
     if (data && Array.isArray(data)) {
       renderMessage(data.join('\n'), true);
     } else {
-      renderMessage(data, true);
+      if (typeof data === 'object' && data.error) {
+        renderMessage(data.error, true);
+      } else {
+        renderMessage(data, true);
+      }
     }
   })
   .catch(function(err) {

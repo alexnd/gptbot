@@ -6,19 +6,32 @@ const https = require('https');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const express = require('express');
-//to add this use command: npm install socket.io
-//const socketIo = require('socket.io');
+const { Configuration: OpenAIConfiguration, OpenAIApi } = require('openai');
 
 const PORT = process.env.API_PORT || 3000;
 const ADDR = process.env.API_ADDR || '0.0.0.0';
 const ROOT_PATH = process.env.ROOT_PATH || '/api';
-const OPENAI_API_URI = process.env.OPENAI_API_URI || 'https://api.openai.com/v1/';
-const OPENAI_FUNCTION = process.env.OPENAI_FUNCTION || 'completions';
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'text-davinci-003';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
 const OPENAI_TEMPERATURE = process.env.OPENAI_TEMPERATURE || 0;
 const OPENAI_MAX_TOKENS = process.env.OPENAI_MAX_TOKENS || 7;
 
 //console.log('*[env]', process.env);
+
+if (!OPENAI_API_KEY) {
+  console.log('Error: OPENAI_API_KEY not set');
+  process.exit(1);
+}
+const openAIConfig = new OpenAIConfiguration({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+const openaiApi = new OpenAIApi(openAIConfig);
+if (!openaiApi) {
+  console.log('Error: OPENAI not available');
+  process.exit(1);
+}
+
+const history = [];
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -44,7 +57,6 @@ app.use((req, res, next) => {
 });
 
 const httpServer = http.createServer(app);
-//const io = new socketIo.Server(httpServer);
 
 app.get(ROOT_PATH, (req, res) => {
   if (req.isAjax) {
@@ -59,16 +71,10 @@ app.post(`${ROOT_PATH}/chat`, (req, res) => {
   if (msg) {
     chatGTPcompletions(msg)
       .then(result => {
-        let resp = []
-        if (result.choices) {
-          for (let c of result.choices) {
-            resp.push(c.text);
-          }
-        }
-        res.json(resp);
+        res.json([result]);
       })
-      .catch(err => {
-        res.json({ error: err.message });
+      .catch(error => {
+        res.json({ error });
       });
   } else {
     res.json({ error: 'Message required' });
@@ -91,19 +97,6 @@ app.use((err, req, res, next) => {
   res.sendError(err.message || '', 500);
 });
 
-// Websockets
-//io.on('connection', (socket) => {
-//  console.log('*[io connected]', socket.handshake.query);
-//  socket.on('disconnect', () => {
-//        console.log('*[io disconnected]');
-//  });
-//  socket.on('chat message', (msg) => {
-//    console.log('*[io chat message]', msg);
-//    wsBroadcast(msg, 'chat message');
-//  });
-//  socket.broadcast.emit('user connection');
-//});
-
 // start server
 httpServer.listen(PORT, ADDR, () => {
   console.log(`API server started on http://${ADDR}:${PORT} at ${dt()}`);
@@ -113,86 +106,25 @@ function dt(d) {
   return (d ? new Date(d) : new Date()).toISOString().substr(0, 19);
 }
 
-// broadcast to websockets (emit the event to all connected sockets)
-//function wsBroadcast(payload, id = 'message') {
-//  io.emit(id, payload);
-//}
-
-/*
-curl https://api.openai.com/v1/completions \
--H "Content-Type: application/json" \
--H "Authorization: Bearer YOUR_API_KEY" \
--d '{"model": "text-davinci-003", "prompt": "Say this is a test", "temperature": 0, "max_tokens": 7}'
-
-*responce {
-  id: 'cmpl-6Yl3kCi5yVXZDmJa1Cn2XrTx23Juo',
-  object: 'text_completion',
-  created: 1673742068,
-  model: 'text-davinci-003',
-  choices: [
-    {
-      text: ' located?\n\nUkraine is located',
-      index: 0,
-      logprobs: null,
-      finish_reason: 'length'
-    }
-  ],
-  usage: { prompt_tokens: 3, completion_tokens: 7, total_tokens: 10 }
-}
-*/
 function chatGTPcompletions(message) {
   return new Promise(async (resolve, reject) => {
-    if (!process.env.OPENAI_API_KEY) {
-        return reject(new Error('OPENAI_API_KEY not set'))
-      }
-      if (!process.env.OPENAI_API_URI) {
-        return reject(new Error('OPENAI_API_URI not set'))
-      }
-      const uri = `${OPENAI_API_URI}${OPENAI_FUNCTION}`;
-      //console.log('*uri:', uri);
-      const u = url.parse(uri);
-      //console.log('*url:', uri);
-      const payload = {
+    const messages = [];
+    for (const [input, completion] of history) {
+      messages.push({ role: 'user', content: input });
+      messages.push({ role: 'assistant', content: completion });
+    }
+    messages.push({ role: 'user', content: message });
+    try {
+      const completion = await openaiApi.createChatCompletion({
         model: OPENAI_MODEL,
-        prompt: message,
-        temperature: +OPENAI_TEMPERATURE,
-        max_tokens: +OPENAI_MAX_TOKENS,
-      };
-      const options = {
-        hostname: u.hostname,
-        path: u.path,
-        port: u.protocol === 'https:' ? 443 : 80,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-      };
-      //console.log('*options:', options);
-      //console.log('*payload:', payload);
-      const req = https.request(options, res => {
-        let data = '';
-        res.on('data', chunk => {
-          data += chunk;
-        });
-        res.on('end', () => {
-        let json = {};
-        if (data) {
-            try {
-            Object.assign(json, JSON.parse(data));
-            } catch (e) {
-            console.error(e);
-            }
-        }
-        console.log('*responce', json);
-        resolve(json);
-        });
+        messages,
       });
-      req.on('error', err => {
-        console.error(err);
-        reject(err);
-      });
-      req.write(JSON.stringify(payload));
-      req.end();
+      const text = completion.data.choices[0].message.content;
+      console.log('*completion:', text);
+      history.push([message, text]);
+      resolve(text);
+    } catch (e) {
+      reject(e.message);
+    }
   });
 }
